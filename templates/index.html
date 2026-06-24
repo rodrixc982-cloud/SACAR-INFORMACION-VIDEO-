@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proyecto Educativo - Info del Dispositivo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .consent-box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+        }
+        .data-box {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+        .video-container {
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔬 Proyecto Educativo - Información del Dispositivo</h1>
+    
+    <div class="consent-box">
+        <h2>⚠️ Consentimiento Informado</h2>
+        <p><strong>Propósito educativo:</strong> Este proyecto muestra cómo las aplicaciones web pueden acceder a cierta información del dispositivo.</p>
+        <p><strong>Datos que se recolectarán:</strong></p>
+        <ul>
+            <li>Información básica del navegador</li>
+            <li>Nivel de batería (si está disponible)</li>
+            <li>Ubicación (SOLO si das permiso explícito)</li>
+        </ul>
+        <p><strong>Los datos se mostrarán solo en tu pantalla y en la consola del servidor local.</strong></p>
+        
+        <label>
+            <input type="checkbox" id="consentCheckbox">
+            Acepto compartir esta información para fines educativos
+        </label>
+        
+        <div style="margin-top: 15px;">
+            <button id="enableAllBtn" disabled>Habilitar Todas las Funciones</button>
+            <button id="basicOnlyBtn" disabled>Solo Información Básica</button>
+        </div>
+    </div>
+
+    <div class="video-container">
+        <h2>📺 Video Educativo</h2>
+        <iframe 
+            width="560" 
+            height="315" 
+            src="https://www.youtube.com/embed/dQw4w9WgXcQ" 
+            frameborder="0" 
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+            allowfullscreen>
+        </iframe>
+    </div>
+
+    <div id="dataDisplay" class="data-box">
+        <h2>📊 Información de tu Dispositivo:</h2>
+        <p><strong>Navegador:</strong> <span id="userAgent">Cargando...</span></p>
+        <p><strong>Idioma:</strong> <span id="language">Cargando...</span></p>
+        <p><strong>Plataforma:</strong> <span id="platform">Cargando...</span></p>
+        <p><strong>En línea:</strong> <span id="online">Cargando...</span></p>
+        <p><strong>Batería:</strong> <span id="batteryInfo">Cargando...</span></p>
+        <p><strong>Ubicación:</strong> <span id="locationInfo">No solicitada</span></p>
+    </div>
+
+    <script>
+        // Elementos del DOM
+        const consentCheckbox = document.getElementById('consentCheckbox');
+        const enableAllBtn = document.getElementById('enableAllBtn');
+        const basicOnlyBtn = document.getElementById('basicOnlyBtn');
+        const dataDisplay = document.getElementById('dataDisplay');
+        
+        // Datos a recolectar
+        let deviceData = {
+            userAgent: navigator.userAgent,
+            language: navigator.language || navigator.userLanguage,
+            platform: navigator.platform,
+            online: navigator.onLine,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Habilitar botones cuando den consentimiento
+        consentCheckbox.addEventListener('change', function() {
+            const isChecked = this.checked;
+            enableAllBtn.disabled = !isChecked;
+            basicOnlyBtn.disabled = !isChecked;
+            
+            if (!isChecked) {
+                dataDisplay.style.display = 'none';
+            }
+        });
+        
+        // Solo información básica
+        basicOnlyBtn.addEventListener('click', function() {
+            if (!consentCheckbox.checked) return;
+            
+            // Mostrar datos básicos
+            updateDisplay();
+            sendToServer();
+            dataDisplay.style.display = 'block';
+        });
+        
+        // Todas las funciones (incluye ubicación)
+        enableAllBtn.addEventListener('click', function() {
+            if (!consentCheckbox.checked) return;
+            
+            // 1. Obtener información de batería
+            if ('getBattery' in navigator) {
+                navigator.getBattery().then(battery => {
+                    deviceData.battery = {
+                        level: battery.level,
+                        charging: battery.charging
+                    };
+                    updateDisplay();
+                    sendToServer();
+                });
+            }
+            
+            // 2. Solicitar ubicación (solo con permiso explícito)
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        deviceData.geolocation = {
+                            lat: position.coords.latitude,
+                            lon: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        };
+                        updateDisplay();
+                        sendToServer();
+                    },
+                    (error) => {
+                        console.log("Ubicación denegada:", error.message);
+                        deviceData.geolocationError = error.message;
+                        updateDisplay();
+                        sendToServer();
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            }
+            
+            dataDisplay.style.display = 'block';
+        });
+        
+        // Actualizar la visualización
+        function updateDisplay() {
+            document.getElementById('userAgent').textContent = deviceData.userAgent;
+            document.getElementById('language').textContent = deviceData.language;
+            document.getElementById('platform').textContent = deviceData.platform;
+            document.getElementById('online').textContent = deviceData.online ? 'Sí' : 'No';
+            
+            if (deviceData.battery) {
+                const batteryPercent = (deviceData.battery.level * 100).toFixed(0);
+                const charging = deviceData.battery.charging ? ' (Cargando)' : '';
+                document.getElementById('batteryInfo').textContent = `${batteryPercent}%${charging}`;
+            } else {
+                document.getElementById('batteryInfo').textContent = 'No disponible';
+            }
+            
+            if (deviceData.geolocation) {
+                document.getElementById('locationInfo').textContent = 
+                    `Lat: ${deviceData.geolocation.lat.toFixed(4)}, Lon: ${deviceData.geolocation.lon.toFixed(4)}`;
+            } else if (deviceData.geolocationError) {
+                document.getElementById('locationInfo').textContent = 'Permiso denegado';
+            }
+        }
+        
+        // Enviar datos al servidor Flask
+        function sendToServer() {
+            fetch('/api/device-info', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(deviceData)
+            })
+            .then(response => response.json())
+            .then(data => console.log('Datos enviados al servidor:', data))
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>
